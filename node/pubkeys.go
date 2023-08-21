@@ -118,7 +118,18 @@ func (lnd *LND) GetNodes(ctx context.Context) (map[string]string, error) {
 	if err != nil {
 		return pubkeys, fmt.Errorf("error describing graph: %w", err)
 	}
+
+	info, err := lnd.client.GetInfo(ctx, &lnrpc.GetInfoRequest{})
+	if err != nil {
+		return pubkeys, fmt.Errorf("error gettng info on node: %s", err.Error())
+	}
+	ourPubkey := info.IdentityPubkey
+
 	for _, node := range graph.Nodes {
+		// exclude our own node so we don't keysend to ourselves (self-payments not allowed)
+		if node.PubKey == ourPubkey {
+			continue
+		}
 		pubkeys[node.PubKey] = node.Alias
 	}
 	return pubkeys, nil

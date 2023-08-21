@@ -21,7 +21,7 @@ func main() {
 	flag.StringVar(&tlsPath, "tls-path", "./tls.cert", "Specify absolute or relative path to tls.cert")
 	flag.StringVar(&macaroonPath, "macaroon-path", "./admin.macaroon", "Specify absolute or relative path to admin.macaroon")
 	flag.StringVar(&network, "network", "regtest", "Specify network node is to use (e.g. mainnet, testnet, regtest)")
-	flag.StringVar(&message, "message", "sample-message-in-the-keysend", "Specify message to send in the keysend payment")
+	flag.StringVar(&message, "message", "gm lightning network!", "Specify message to send in the keysend payment")
 	flag.Int64Var(&amount, "amount", 1, "Specify amount in sats to spend for each keysend")
 
 	flag.Parse()
@@ -87,7 +87,7 @@ func main() {
 		return
 	}
 	fmt.Printf("%d new pubkeys added, %d stored in the db\n", newKeysAdded, numNodes)
-	err = lnd.Keysend(ctx, amount, "74657374696E67206D79207370616D20746F6F6C")
+	err = lnd.Keysend(ctx, amount, []byte(message))
 	if err != nil {
 		fmt.Printf("error executing keysend: %s\n", err.Error())
 	}

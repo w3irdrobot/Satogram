@@ -13,7 +13,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc/routerrpc"
 )
 
-func (lnd *LND) Keysend(ctx context.Context, sats int64, message string) error {
+func (lnd *LND) Keysend(ctx context.Context, sats int64, message []byte) error {
 	// lncli sendpayment --keysend --dest <pubkey> --amt 25000
 	fn := func(pk string, client routerrpc.Router_SendPaymentV2Client) error {
 		for {
@@ -27,6 +27,7 @@ func (lnd *LND) Keysend(ctx context.Context, sats int64, message string) error {
 
 			// continue receiving updated while IN_FLIGHT
 			if payment.Status != lnrpc.Payment_IN_FLIGHT {
+				fmt.Printf("pubkey: %s status: %s failure-reason: %s\n", pk, payment.Status.String(), payment.FailureReason.String())
 				return nil
 			}
 		}
@@ -69,12 +70,11 @@ func (lnd *LND) Keysend(ctx context.Context, sats int64, message string) error {
 		if err != nil {
 			return false, fmt.Errorf("error decoing pk: %s with error: %s", pk, err.Error())
 		}
-
 		client, err := lnd.router.SendPaymentV2(ctx, &routerrpc.SendPaymentRequest{
 			Amt: sats,
 			DestCustomRecords: map[uint64][]byte{
 				5482373484: []byte(preImageFinal),
-				34349334:   []byte(message),
+				34349334:   message,
 			},
 			TimeoutSeconds: 10,
 			Dest:           pkString,
@@ -82,16 +82,17 @@ func (lnd *LND) Keysend(ctx context.Context, sats int64, message string) error {
 			PaymentHash:    []byte(paymentHashFinal),
 		})
 		if err != nil {
-
-			return false, err
+			return false, fmt.Errorf("error calling SendPaymentV2: %s", err.Error())
 		}
 		if err := fn(pk, client); err != nil {
-			return false, err
+			return false, fmt.Errorf("error calling in tracking payment fxn: %s", err.Error())
 		}
 
 		return true, nil
 	}
-	lnd.store.Keys("pk", keysend)
-
+	err := lnd.store.Keys("pk", keysend)
+	if err != nil {
+		return fmt.Errorf("error processing bolt keys for keysending: %s", err.Error())
+	}
 	return nil
 }
