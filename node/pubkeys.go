@@ -2,6 +2,7 @@ package node
 
 import (
 	"Satogram/storage"
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -18,14 +19,15 @@ import (
 )
 
 type LND struct {
-	client lnrpc.LightningClient
-	state  lnrpc.StateClient
-	router routerrpc.RouterClient
-	wt     wtclientrpc.WatchtowerClientClient
-	wallet walletrpc.WalletKitClient
-	logger *logrus.Logger
-	cfg    *LNDConfig
-	store  *storage.Bolt
+	client         lnrpc.LightningClient
+	state          lnrpc.StateClient
+	router         routerrpc.RouterClient
+	wt             wtclientrpc.WatchtowerClientClient
+	wallet         walletrpc.WalletKitClient
+	logger         *logrus.Logger
+	cfg            *LNDConfig
+	store          *storage.Bolt
+	excludePubkeys []string
 }
 
 type LNDConfig struct {
@@ -37,7 +39,11 @@ type LNDConfig struct {
 
 var conn = &grpc.ClientConn{}
 
-func NewLND(store *storage.Bolt, host, tlsPath, macaroonPath, network string) (LND, error) {
+func NewLND(store *storage.Bolt, host, tlsPath, macaroonPath, network, excludePath string) (LND, error) {
+	excludedPubkeys, err := ExcludedPubkeys(excludePath)
+	if err != nil {
+		return LND{}, fmt.Errorf("error generating excluded pubkeys list: %s", err.Error())
+	}
 	return LND{
 		cfg: &LNDConfig{
 			Host:         host,
@@ -45,8 +51,32 @@ func NewLND(store *storage.Bolt, host, tlsPath, macaroonPath, network string) (L
 			MacaroonPath: macaroonPath,
 			Network:      network,
 		},
-		store: store,
+		store:          store,
+		excludePubkeys: excludedPubkeys,
 	}, nil
+}
+
+func ExcludedPubkeys(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return []string{}, fmt.Errorf("error opening excluded pubkeys file: %s", err.Error())
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return []string{}, fmt.Errorf("error with scanner for excluded pubkeys file: %s", err.Error())
+	}
+
+	return lines, nil
 }
 
 func (lnd *LND) Ping(ctx context.Context) error {

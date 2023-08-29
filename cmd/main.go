@@ -14,16 +14,16 @@ import (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var host, tlsPath, macaroonPath, network, message string
+	var host, tlsPath, macaroonPath, network, message, excludePath string
 	var amount int64
 
 	flag.StringVar(&host, "host", "localhost:10001", "Specify node's host address")
-	flag.StringVar(&tlsPath, "tls-path", "./tls.cert", "Specify absolute or relative path to tls.cert")
-	flag.StringVar(&macaroonPath, "macaroon-path", "./admin.macaroon", "Specify absolute or relative path to admin.macaroon")
+	flag.StringVar(&tlsPath, "tls-path", "./tls.cert", "Specify absolute path to tls.cert")
+	flag.StringVar(&macaroonPath, "macaroon-path", "./admin.macaroon", "Specify absolute path to admin.macaroon")
 	flag.StringVar(&network, "network", "regtest", "Specify network node is to use (e.g. mainnet, testnet, regtest)")
 	flag.StringVar(&message, "message", "gm lightning network!", "Specify message to send in the keysend payment")
 	flag.Int64Var(&amount, "amount", 1, "Specify amount in sats to spend for each keysend")
-
+	flag.StringVar(&excludePath, "exclude-pubkeys-path", "exclude-pubkeys.txt", "Specify path to .txt file of pubkeys to exclude keysending to")
 	flag.Parse()
 	// setup the storage
 	store, err := storage.NewBolt(path.Join("./", "satogram.db"))
@@ -39,11 +39,10 @@ func main() {
 			return false, fmt.Errorf("error getting value from store with key: %s and error: %w", key, err)
 		}
 		fmt.Printf("got stored key: %s  alias: %s\n", key, string(alias))
-
 		return true, nil
 	})
 
-	lnd, err := node.NewLND(store, host, tlsPath, macaroonPath, network)
+	lnd, err := node.NewLND(store, host, tlsPath, macaroonPath, network, excludePath)
 	if err != nil {
 		fmt.Printf("Error creating lnd struct: %s\n", err.Error())
 		return
@@ -64,6 +63,7 @@ func main() {
 		fmt.Printf("failed to get pubkeys: %s\n", err.Error())
 		return
 	}
+
 	newKeysAdded := 0
 	for pk, alias := range pubkeys {
 		val, err := store.Get(fmt.Sprintf("pk %s", pk))
