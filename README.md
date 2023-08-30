@@ -24,3 +24,16 @@ If you do a `hex.DecodeString("676d206c696768746e696e67206e6574776f726b21")` and
 Here is that bit in code: https://go.dev/play/p/IbX2QolRkbp
 
 If this format is wrong please tell me and I will fix.
+
+## Get all chats
+
+Below is a simple shell command for outputting all the chats your node has received.
+
+```shell
+RPC_URL="my.server.api:10009"
+MACAROON_PATH="path/to/admin.macaroon"
+
+lncli --rpcserver="$RPC_URL" --macaroonpath="$MACAROON_PATH" --tlscertpath="" listinvoices | \
+    jq -r '.invoices[].htlcs[].custom_records["34349334"] | select(. != null)' | \
+    xargs -I % -n 1 sh -c "echo % | xxd -r -p | xargs echo"
+```
